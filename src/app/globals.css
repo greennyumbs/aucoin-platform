@@ -1,0 +1,69 @@
+@import "tailwindcss";
+
+:root {
+  --gold: #f59e0b;
+  --gold-light: #fcd34d;
+  --gold-dark: #d97706;
+}
+
+body {
+  background-color: #0a0a0f;
+  color: #f1f5f9;
+  /* font-family is set by next/font (Sarabun — supports Thai + Latin) */
+}
+
+.card {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(245, 158, 11, 0.15);
+  border-radius: 1rem;
+}
+
+.btn-gold {
+  display: inline-block;
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: #0a0a0f;
+  font-weight: 700;
+  border-radius: 0.5rem;
+  padding: 0.625rem 1.5rem;
+  transition: opacity 0.15s, transform 0.1s;
+  cursor: pointer;
+  text-align: center;
+}
+
+.btn-gold:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.btn-gold:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.input-field {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+  border-radius: 0.5rem;
+  padding: 0.625rem 0.875rem;
+  color: #f1f5f9;
+  width: 100%;
+  outline: none;
+  transition: border-color 0.15s;
+  /* Ensure selects render dark on all browsers */
+  color-scheme: dark;
+}
+
+.input-field:focus {
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.15);
+}
+
+.input-field::placeholder {
+  color: rgba(241, 245, 249, 0.3);
+}
+
+/* iOS safe-area padding for the mobile bottom nav */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0.5rem);
+}
