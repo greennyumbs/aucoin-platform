@@ -2,7 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { getUsers, createUser, getUserByName } from "@/lib/store";
 
 export async function GET() {
-  return NextResponse.json(getUsers());
+  try {
+    return NextResponse.json(await getUsers());
+  } catch {
+    return NextResponse.json([]);
+  }
 }
 
 export async function POST(req: NextRequest) {
@@ -27,6 +31,6 @@ export async function POST(req: NextRequest) {
       ? Math.floor(body.initialBalance)
       : 0;
 
-  const user = createUser(name, initialBalance);
+  const user = await createUser(name, initialBalance);
   return NextResponse.json(user, { status: 201 });
 }

@@ -7,7 +7,7 @@ export async function getUsers(): Promise<User[]> {
     .select("*")
     .order("created_at", { ascending: true });
 
-  if (error) throw error;
+  if (error || !data) return [];
 
   return data.map((row) => ({
     id: row.id,
@@ -80,7 +80,7 @@ export async function getTransactions(): Promise<Transaction[]> {
     .select("*")
     .order("timestamp", { ascending: false });
 
-  if (error) throw error;
+  if (error || !data) return [];
 
   return data.map((row) => ({
     id: row.id,
