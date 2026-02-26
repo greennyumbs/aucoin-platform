@@ -1,100 +1,156 @@
 import { User, Transaction } from "@/types";
+import { supabase } from "./supabase";
 
-// Global in-memory store — persists for the lifetime of the Node.js process.
-// Works great for low-traffic, short-duration use (e.g. 5 users, 2 days).
-// Note: resets on cold start / Vercel redeploy.
+export async function getUsers(): Promise<User[]> {
+  const { data, error } = await supabase
+    .from("users")
+    .select("*")
+    .order("created_at", { ascending: true });
 
-declare global {
-  // eslint-disable-next-line no-var
-  var __store: Store | undefined;
+  if (error) throw error;
+
+  return data.map((row) => ({
+    id: row.id,
+    name: row.name,
+    balance: row.balance,
+    createdAt: row.created_at,
+  }));
 }
 
-interface Store {
-  users: Map<string, User>;
-  transactions: Transaction[];
-}
+export async function getUserById(id: string): Promise<User | undefined> {
+  const { data, error } = await supabase
+    .from("users")
+    .select("*")
+    .eq("id", id)
+    .single();
 
-function createStore(): Store {
+  if (error) return undefined;
+
   return {
-    users: new Map(),
-    transactions: [],
+    id: data.id,
+    name: data.name,
+    balance: data.balance,
+    createdAt: data.created_at,
   };
 }
 
-// Reuse the same store across hot-reloads in dev
-if (!global.__store) {
-  global.__store = createStore();
-}
+export async function getUserByName(name: string): Promise<User | undefined> {
+  const { data, error } = await supabase
+    .from("users")
+    .select("*")
+    .ilike("name", name.trim())
+    .single();
 
-const store = global.__store;
+  if (error) return undefined;
 
-// ── Users ──────────────────────────────────────────────────────────────────
-
-export function getUsers(): User[] {
-  return Array.from(store.users.values()).sort(
-    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-  );
-}
-
-export function getUserById(id: string): User | undefined {
-  return store.users.get(id);
-}
-
-export function getUserByName(name: string): User | undefined {
-  return Array.from(store.users.values()).find(
-    (u) => u.name.toLowerCase() === name.toLowerCase()
-  );
-}
-
-export function createUser(name: string, initialBalance: number): User {
-  const id = crypto.randomUUID();
-  const user: User = {
-    id,
-    name: name.trim(),
-    balance: initialBalance,
-    createdAt: new Date().toISOString(),
+  return {
+    id: data.id,
+    name: data.name,
+    balance: data.balance,
+    createdAt: data.created_at,
   };
-  store.users.set(id, user);
-  return user;
 }
 
-// ── Transactions ───────────────────────────────────────────────────────────
+export async function createUser(
+  name: string,
+  initialBalance: number
+): Promise<User> {
+  const { data, error } = await supabase
+    .from("users")
+    .insert({
+      name: name.trim(),
+      balance: initialBalance,
+    })
+    .select()
+    .single();
 
-export function getTransactions(): Transaction[] {
-  return [...store.transactions].sort(
-    (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-  );
+  if (error) throw error;
+
+  return {
+    id: data.id,
+    name: data.name,
+    balance: data.balance,
+    createdAt: data.created_at,
+  };
 }
 
-export function executeTrade(
+export async function getTransactions(): Promise<Transaction[]> {
+  const { data, error } = await supabase
+    .from("transactions")
+    .select("*")
+    .order("timestamp", { ascending: false });
+
+  if (error) throw error;
+
+  return data.map((row) => ({
+    id: row.id,
+    fromId: row.from_id,
+    fromName: row.from_name,
+    toId: row.to_id,
+    toName: row.to_name,
+    amount: row.amount,
+    note: row.note ?? "",
+    timestamp: row.timestamp,
+  }));
+}
+
+export async function executeTrade(
   fromId: string,
   toId: string,
   amount: number,
   note: string
-): { ok: true; tx: Transaction } | { ok: false; error: string } {
-  const from = store.users.get(fromId);
-  const to = store.users.get(toId);
+): Promise<{ ok: true; tx: Transaction } | { ok: false; error: string }> {
+  const from = await getUserById(fromId);
+  const to = await getUserById(toId);
 
   if (!from) return { ok: false, error: "Sender not found." };
   if (!to) return { ok: false, error: "Recipient not found." };
   if (fromId === toId) return { ok: false, error: "Cannot send to yourself." };
-  if (amount <= 0) return { ok: false, error: "Amount must be greater than 0." };
-  if (from.balance < amount) return { ok: false, error: `Insufficient balance. You have ${from.balance} AUC.` };
+  if (amount <= 0)
+    return { ok: false, error: "Amount must be greater than 0." };
+  if (from.balance < amount)
+    return {
+      ok: false,
+      error: `Insufficient balance. You have ${from.balance} AUC.`,
+    };
 
-  from.balance -= amount;
-  to.balance += amount;
+  const { error: updateError } = await supabase.rpc("execute_trade", {
+    p_from_id: fromId,
+    p_to_id: toId,
+    p_amount: amount,
+    p_from_name: from.name,
+    p_to_name: to.name,
+    p_note: note?.trim() || "",
+  });
 
-  const tx: Transaction = {
-    id: crypto.randomUUID(),
-    fromId,
-    fromName: from.name,
-    toId,
-    toName: to.name,
-    amount,
-    note: note?.trim() || "",
-    timestamp: new Date().toISOString(),
+  if (updateError) {
+    return { ok: false, error: updateError.message };
+  }
+
+  const { data: txData, error: txError } = await supabase
+    .from("transactions")
+    .select("*")
+    .eq("from_id", fromId)
+    .eq("to_id", toId)
+    .order("timestamp", { ascending: false })
+    .limit(1)
+    .single();
+
+  if (txError) {
+    return { ok: false, error: txError.message };
+  }
+
+  return {
+    ok: true,
+    tx: {
+      id: txData.id,
+      fromId: txData.from_id,
+      fromName: txData.from_name,
+      toId: txData.to_id,
+      toName: txData.to_name,
+      amount: txData.amount,
+      note: txData.note ?? "",
+      timestamp: txData.timestamp,
+    },
   };
-
-  store.transactions.push(tx);
-  return { ok: true, tx };
 }

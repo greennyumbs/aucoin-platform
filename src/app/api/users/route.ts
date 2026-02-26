@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Name must be 30 characters or less." }, { status: 400 });
   }
 
-  if (getUserByName(name)) {
+  if (await getUserByName(name)) {
     return NextResponse.json({ error: "That name is already taken." }, { status: 409 });
   }
 

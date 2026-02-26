@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Amount must be a positive number." }, { status: 400 });
   }
 
-  const result = executeTrade(fromId, toId, Math.floor(amount), note ?? "");
+  const result = await executeTrade(fromId, toId, Math.floor(amount), note ?? "");
 
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: 400 });
